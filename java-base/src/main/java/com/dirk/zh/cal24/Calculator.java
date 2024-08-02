@@ -1,43 +1,81 @@
 package com.dirk.zh.cal24;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
-public class Cal24Main {
+public class Calculator {
 
-    public static void main(String[] args) {
-        int result = new Cal24Main().compute("1+ 2*3*4/2-5-6");
-        System.out.println("result = " + result);
-    }
-
-    int nodeIndex;
-    List<Node> nodes = new ArrayList<>();
+    private String expression;
+    private int nodeIndex;
+    private List<Node> nodes;
 
     public int compute(String expression) {
 
-        buildNodes(expression.toCharArray());
+        this.expression = expression;
+        this.nodeIndex = 0;
+        this.nodes = new ArrayList<>();
+
+        checkExpression();
+        buildNodes();
 
         Node ast = plusOrMinus();
 
-        return compute(ast);
+        System.out.println("\n==============" + expression + "============开始计算");
+        int result = compute(ast);
+        System.out.println(expression + " = " + result);
+        System.out.println("==============" + expression + "============计算结束\n");
+
+        return result;
+    }
+
+    /**
+     * 检查表达式是否合法
+     */
+    private void checkExpression() {
+
+        // 1.检查括号是否成对
+        LinkedList<Character> stack = new LinkedList<>();
+        for (int i = 0; i < expression.length(); i++) {
+            char ch = expression.charAt(i);
+            if (isLeftParen(ch)) {
+                stack.addLast(ch);
+            } else if (isRightParen(ch)) {
+                Character lastCh = stack.pollLast();
+                if (lastCh == null) {
+                    throw new IllegalArgumentException("缺少左括号：" + expression.substring(0, i));
+                }
+            }
+        }
+
+        if (!stack.isEmpty()) {
+            throw new IllegalArgumentException("缺少右括号：" + expression);
+        }
+
     }
 
     /**
      * 将计算表达式转为计算节点
      */
-    private void buildNodes(char[] chs) {
+    private void buildNodes() {
 
+        char[] chs = expression.toCharArray();
         for (int i = 0; i < chs.length; i++) {
             char ch = chs[i];
+            if (Character.isSpaceChar(ch)) {
+                continue;
+            }
             if (Character.isDigit(ch)) {
                 int sum = 0;
                 do {
                     sum = sum * 10 + Character.digit(ch, 10);
                 } while (i < chs.length - 1 && Character.isDigit((ch = chs[++i])));
                 nodes.add(new NumNode(sum));
-                if (i < chs.length - 1 && ch!=' ') {
+                if (i <= chs.length - 1 && ch != ' ') {
                     nodes.add(new OperNode(ch));
                 }
+            } else {
+                nodes.add(new OperNode(ch));
             }
         }
 
@@ -52,27 +90,10 @@ public class Cal24Main {
             int left = compute(operNode.left);
             int right = compute(operNode.right);
             char oper = operNode.oper;
-            return compute(left, right, oper);
+            return ComputeUtil.compute(left, right, oper);
         }
     }
 
-    private int compute(int left, int right, char oper) {
-        int result = 0;
-        if (oper == '+') {
-            result = left + right;
-            System.out.println(left + "+" + right + "=" + result);
-        } else if (oper == '-') {
-            result = left - right;
-            System.out.println(left + "-" + right + "=" + result);
-        } else if (oper == '*') {
-            result = left * right;
-            System.out.println(left + "*" + right + "=" + result);
-        } else if (oper == '/') {
-            result = left / right;
-            System.out.println(left + "/" + right + "=" + result);
-        }
-        return result;
-    }
 
     /**
      * 构造加法或者减法的节点
@@ -89,7 +110,7 @@ public class Cal24Main {
             expr = nextNode;
             nextNode = nextNode();
         }
-        if (nodeIndex < nodes.size()) {
+        if (nextNode != null) {
             nodeIndex--;
         }
 
@@ -113,7 +134,7 @@ public class Cal24Main {
             nextNode = nextNode();
         }
         // 节点索引判断不是乘除，需要退回一个位置
-        if (nodeIndex < nodes.size()) {
+        if (nextNode != null) {
             nodeIndex--;
         }
 
@@ -125,11 +146,37 @@ public class Cal24Main {
             return null;
         }
 
-        return nodes.get(nodeIndex++);
+        Node node = nodes.get(nodeIndex++);
+
+        if (isLeftParen(node)) {
+            Node subAst = plusOrMinus();
+            Node nexNode = nextNode();
+            if (isRightParen(nexNode)) {
+                node = subAst;
+            }
+        }
+
+        return node;
     }
 
     private boolean isProduct(Node node) {
         return node instanceof OperNode && isProduct(((OperNode) node).oper);
+    }
+
+    private boolean isLeftParen(char ch) {
+        return '(' == ch;
+    }
+
+    private boolean isRightParen(char ch) {
+        return ')' == ch;
+    }
+
+    private boolean isLeftParen(Node node) {
+        return node instanceof OperNode && isLeftParen(((OperNode) node).oper);
+    }
+
+    private boolean isRightParen(Node node) {
+        return node instanceof OperNode && isRightParen(((OperNode) node).oper);
     }
 
     private boolean isSum(Node node) {
